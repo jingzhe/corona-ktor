@@ -68,7 +68,7 @@ fun Application.module() {
             call.respond(coronaService.doFetchSnapshot(todayDate))
         }
 
-        get("/counters") {
+        get("/counter") {
             call.respond(counterService.getCounter().counter)
         }
 
