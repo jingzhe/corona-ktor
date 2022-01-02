@@ -10,6 +10,9 @@ import com.jingzhe.corona.model.Snapshot
 import com.jingzhe.corona.utils.CoronaUtils
 import io.ktor.client.*
 import io.ktor.client.request.*
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import org.bson.Document
 import org.litote.kmongo.coroutine.CoroutineClient
 
@@ -19,28 +22,34 @@ class CoronaService(private val counterService: CounterService,
                     private val httpClient: HttpClient) {
 
     private val gson: Gson = GsonBuilder().create()
-    suspend fun getSnapshotData(): Map<String, Int> {
-        counterService.updateCounter()
+    suspend fun getSnapshotData(): Map<String, Int> = coroutineScope {
+        launch { counterService.updateCounter() }
         val todayDate = CoronaUtils.getTodayDate()
-        val snap = dbClient.getDatabase(dbName)
-            .getCollection<Snapshot>("snapshot")
-            .findOne(Document("_id", todayDate))
-            ?: doFetchSnapshot(todayDate)
-        return snap.data
+        val snap = async {
+            dbClient.getDatabase(dbName)
+                .getCollection<Snapshot>("snapshot")
+                .findOne(Document("_id", todayDate))
+                ?: doFetchSnapshot(todayDate)
+        }
+        snap.await().data
     }
 
-    suspend fun getOldSnapshotData(date: String): Map<String, DistrictData> {
+    suspend fun getOldSnapshotData(date: String): Map<String, DistrictData> = coroutineScope {
         val nextDate = CoronaUtils.getNextDate(date)
         val snapCollection = dbClient.getDatabase(dbName)
             .getCollection<Snapshot>("snapshot")
-        val nextSnap = snapCollection
-            .findOne(Document("_id", nextDate))
-            ?: throw Exception("Wrong next date")
-        val prevSnap = snapCollection
-            .findOne(Document("_id", date))
-            ?: throw Exception("Wrong date")
+        val nextSnap = async {
+            snapCollection
+                .findOne(Document("_id", nextDate))
+                ?: throw Exception("Wrong next date")
+        }
+        val prevSnap = async {
+            snapCollection
+                .findOne(Document("_id", date))
+                ?: throw Exception("Wrong date")
+        }
 
-        return calculateDistrictData(nextSnap, prevSnap)
+        calculateDistrictData(nextSnap.await(), prevSnap.await())
     }
 
     suspend fun doFetchSnapshot(todayDate: String): Snapshot {

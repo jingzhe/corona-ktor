@@ -69,7 +69,7 @@ fun Application.module() {
         }
 
         get("/counters") {
-            call.respond(counterService.getCounter())
+            call.respond(counterService.getCounter().counter)
         }
 
         get("/feedbacks") {
